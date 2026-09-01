@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ひぐらし風 中１理科クイズ：惨劇回避編</title>
+    <style>
+        body {
+            background-color: #080808;
+            color: #dcdcdc;
+            font-family: 'MS Mincho', 'Times New Roman', serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            width: 800px;
+            height: 450px;
+            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)), 
+                        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23141414"/><circle cx="50" cy="50" r="1.5" fill="%23262626"/></svg>');
+            border: 2px solid #444;
+            position: relative;
+            box-shadow: 0 0 25px rgba(150, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 25px;
+            box-sizing: border-box;
+        }
+        #header-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #7f8c8d;
+            letter-spacing: 2px;
+            border-bottom: 1px dashed #444;
+            padding-bottom: 10px;
+        }
+        #loop-count {
+            color: #ff4444;
+        }
+        #main-display {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 10px;
+        }
+        #speaker {
+            font-size: 18px;
+            color: #ff3333;
+            margin-bottom: 10px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        #question-text {
+            font-size: 18px;
+            line-height: 1.6;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+        #choices-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .choice-btn {
+            background: rgba(15, 15, 20, 0.9);
+            color: #e0e0e0;
+            border: 1px solid #770000;
+            padding: 12px;
+            font-size: 15px;
+            font-family: inherit;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.2s;
+        }
+        .choice-btn:hover {
+            background: rgba(130, 0, 0, 0.6);
+            color: #fff;
+            border-color: #ff3333;
+        }
+        #next-btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #888;
+            padding: 10px;
+            font-family: inherit;
+            cursor: pointer;
+            display: none;
+            text-align: center;
+        }
+        #next-btn:hover {
+            background: #444;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        #start-btn {
+            background: #400;
+            color: #fff;
+            border: 2px solid #ff3333;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-family: inherit;
+            cursor: pointer;
+            letter-spacing: 2px;
+        }
+        #start-btn:hover {
+            background: #800;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- スタート画面：ブラウザの音声制限を回避するため、最初にクリックを挟みます -->
+        <div id="start-screen">
+            <p style="color: #bbb; margin-bottom: 20px; letter-spacing: 2px;">音量にご注意ください。BGMが再生されます。</p>
+            <button id="start-btn" onclick="startGame()">ゲームを始める</button>
+        </div>
+
+        <div id="header-info">
+            <div id="atmosphere">昭和58年初夏……雛見沢村。</div>
+            <div id="loop-display">世界線（ループ）：第<span id="loop-count">1</span>カケラ</div>
+        </div>
+
+        <div id="main-display">
+            <div id="speaker"></div>
+            <div id="question-text"></div>
+        </div>
+
+        <div id="choices-container"></div>
+        <button id="next-btn" onclick="nextStep()">次へ進む</button>
+    </div>
+
+    <script>
+        // --- MP3ファイルを使ったBGM・効果音の設定 ---
+        // ※同じフォルダに「bgm.mp3」と「click.mp3」を配置してください
+        const bgm = new Audio('bgm.mp3');
+        bgm.loop = true;  // ループ再生の設定
+        bgm.volume = 0.5; // 音量 (0.0 ～ 1.0)
+
+        const clickSound = new Audio('click.mp3');
+        clickSound.volume = 0.3;
+
+        // 中１理科クイズシナリオデータ
+        const quizData = [
+            {
+                speaker: "レナ",
+                text: "ねぇ圭一君……。理科の実験で、物質を加熱して発生した気体を水上置換法で集めるとき、一番最初に出てくる気体はどうして集めちゃいけないんだっけ…？",
+                choices: [
+                    { text: "最初に出てくる気体は試験管内の空気が混ざっているから", correct: true, explanation: "正解……。試験管の中に残っていた空気が混ざるから、最初は捨てなきゃいけないんだよ……かな？" },
+                    { text: "最初に出てくる気体は毒性が強すぎるから", correct: false, explanation: "不正解……。そんな危険な気体が最初から出るわけじゃないよ、圭一君……嘘だ！！" },
+                    { text: "最初に出てくる気体はすぐに冷えて液体に戻ってしまうから", correct: false, explanation: "不正解……。気体が冷えるからじゃないよ……圭一君、何か隠してる？" }
+                ]
+            },
+            {
+                speaker: "魅音",
+                text: "おっ、じゃあ次の問題だ！ 質量パーセント濃度が 15% の食塩水 200g に含まれている、溶質の食塩の重さは何gになるかな？ 部活の罰ゲームがかかってるから本気で行くよ！",
+                choices: [
+                    { text: "15g", correct: false, explanation: "不正解！ 200 × 0.15 は……計算ミスだよ、おじさん許しちゃうぞ〜？" },
+                    { text: "30g", correct: true, explanation: "正解！ 200g × 0.15 = 30g だね。さすが部活メンバー、よく分かってるじゃないか！" },
+                    { text: "45g", correct: false, explanation: "不正解！ そんなに多くないよ、もう一回計算し直してよねっ！" }
+                ]
+            },
+            {
+                speaker: "梨花",
+                text: "みぃ〜。ではボクからの問題なのです。水の状態変化についての質問なのです。氷が水に変化するとき、質量と体積はそれぞれどうなるのですか？ 答えなさいなのです。",
+                choices: [
+                    { text: "質量は変わり、体積は小さくなるのです", correct: false, explanation: "はずれなのですよ。質量は変わらないのに、どうして変えちゃうのですか……？" },
+                    { text: "質量は小さくなり、体積は大きくなるのです", correct: false, explanation: "ぶー、みな殺し……じゃなくて不正解なのです。質量が軽くなるわけないのですよ。" },
+                    { text: "質量は変わらず、体積は小さくなるのです", correct: true, explanation: "正解なのです。氷が水になるとき、隙間の多い結晶構造が崩れて体積は小さくなるのですよ。よくできましたなのです。" }
+                ]
+            },
+            {
+                speaker: "？？？",
+                text: "……最後の質問だ。光の反射に関する現象について、正しく述べられているものはどれだ……？",
+                choices: [
+                    { text: "入射角と反射角の大きさは常に等しくなる", correct: true, explanation: "正解……。反射の法則により、入射角と反射角は必ず等しい。この理の狂いは許されない……。" },
+                    { text: "反射角は鏡からの距離によって大きさが変わる", correct: false, explanation: "不正解……。距離なんて関係ない。お前の記憶違いだ……。" },
+                    { text: "屈折角は入射角よりも常に大きくなる", correct: false, explanation: "不正解……。それは物質の組み合わせによる。お前は何も分かっていない……。" }
+                ]
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let loopCount = 1;
+
+        const speakerEl = document.getElementById("speaker");
+        const questionTextEl = document.getElementById("question-text");
+        const choicesContainerEl = document.getElementById("choices-container");
+        const nextBtnEl = document.getElementById("next-btn");
+        const loopCountEl = document.getElementById("loop-count");
+
+        // 「ゲームを始める」ボタンが押された瞬間
+        function startGame() {
+            bgm.play().catch(error => {
+                console.log("BGMの再生がブロックされました", error);
+            });
+
+            document.getElementById("start-screen").style.display = "none";
+            loadQuestion();
+        }
+
+        // ボタン選択時の効果音
+        function playClickSound() {
+            clickSound.currentTime = 0;
+            clickSound.play().catch(e => {});
+        }
+
+        function loadQuestion() {
+            nextBtnEl.style.display = "none";
+            choicesContainerEl.innerHTML = "";
+
+            if (currentQuestionIndex >= quizData.length) {
+                speakerEl.innerText = "―― 雛見沢の夜明け ――";
+                questionTextEl.innerText = "すべての理科の謎を解き明かした……！\nあなたは無事に惨劇の連鎖を断ち切り、平穏な日常を取り戻した。\n【真・END：平和な世界へ】";
+                return;
+            }
+
+            let currentQ = quizData[currentQuestionIndex];
+            speakerEl.innerText = currentQ.speaker;
+            questionTextEl.innerText = currentQ.text;
+
+            currentQ.choices.forEach((choice) => {
+                let btn = document.createElement("button");
+                btn.className = "choice-btn";
+                btn.innerText = choice.text;
+                btn.onclick = () => {
+                    playClickSound();
+                    selectAnswer(choice);
+                };
+                choicesContainerEl.appendChild(btn);
+            });
+        }
+
+        function selectAnswer(choice) {
+            choicesContainerEl.innerHTML = "";
+
+            if (choice.correct) {
+                speakerEl.innerText = "【正解】";
+                questionTextEl.innerText = choice.explanation;
+                nextBtnEl.innerText = "次のカケラへ進む";
+                nextBtnEl.style.display = "block";
+                currentQuestionIndex++;
+            } else {
+                speakerEl.innerText = "【惨劇エンド：疑心暗鬼】";
+                questionTextEl.innerText = choice.explanation + "\n\n――あなたは間違った選択をした。疑念が闇を呼び、世界は再び繰り返される……。\n【バッドエンド】";
+                nextBtnEl.innerText = "最初からやり直す（ループする）";
+                nextBtnEl.style.display = "block";
+                currentQuestionIndex = 0;
+                loopCount++;
+                loopCountEl.innerText = loopCount;
+            }
+        }
+
+        function nextStep() {
+            playClickSound();
+            loadQuestion();
+        }
+    </script>
+
+</body>
+</html>
